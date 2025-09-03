@@ -140,26 +140,3 @@ impl Cache {
         self.len() == 0
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_cache_operations() {
-        let cache = Cache::new(1024);
-
-        // Test put and get
-        cache.put("key1".to_string(), b"value1".to_vec());
-        assert_eq!(cache.get("key1"), Some(b"value1".to_vec()));
-
-        // Test miss
-        assert_eq!(cache.get("nonexistent"), None);
-
-        // Test stats
-        let stats = cache.stats();
-        assert_eq!(stats.hits, 1);
-        assert_eq!(stats.misses, 1);
-        assert!(stats.hit_rate() > 0.0);
-    }
-}

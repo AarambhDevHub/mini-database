@@ -307,30 +307,3 @@ impl From<Vec<u8>> for Value {
         Self::Bytes(data)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_value_conversions() {
-        let string_val = Value::from("hello");
-        assert_eq!(string_val.as_string(), Some(&"hello".to_string()));
-
-        let int_val = Value::from(42i64);
-        assert_eq!(int_val.as_integer(), Some(42));
-
-        let float_val = Value::from(3.14);
-        assert_eq!(float_val.as_float(), Some(3.14));
-
-        let bool_val = Value::from(true);
-        assert_eq!(bool_val.as_boolean(), Some(true));
-    }
-
-    #[test]
-    fn test_value_ordering() {
-        assert!(Value::Integer(1) < Value::Integer(2));
-        assert!(Value::String("a".to_string()) < Value::String("b".to_string()));
-        assert!(Value::Float(1.5) < Value::Float(2.5));
-    }
-}

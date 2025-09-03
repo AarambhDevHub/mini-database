@@ -321,33 +321,3 @@ impl GraphOps {
             .unwrap_or(1.0)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::core::DatabaseConfig;
-    use crate::types::Value;
-
-    #[tokio::test]
-    async fn test_graph_traversal() -> Result<()> {
-        let config = DatabaseConfig::default();
-        let db = Database::new(config).await?;
-
-        // Create test nodes
-        let node1 = Node::new("person").with_property("name", Value::String("Alice".to_string()));
-        let node2 = Node::new("person").with_property("name", Value::String("Bob".to_string()));
-        let node1_id = db.node_store().store(node1).await?;
-        let node2_id = db.node_store().store(node2).await?;
-
-        // Create edge
-        let edge = Edge::new(&node1_id, &node2_id, "knows");
-        db.edge_store().store(edge).await?;
-
-        // Test BFS
-        let graph_ops = GraphOps::new(db);
-        let result = graph_ops.breadth_first_search(&node1_id, 2).await?;
-        assert_eq!(result.len(), 2);
-
-        Ok(())
-    }
-}

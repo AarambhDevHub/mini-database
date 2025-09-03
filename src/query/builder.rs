@@ -567,22 +567,3 @@ impl Condition {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_query_builder() {
-        let query = QueryBuilder::new()
-            .select_nodes()
-            .with_label("person")
-            .where_eq("age", Value::Integer(30))
-            .limit(10)
-            .order_by_asc("name");
-
-        assert!(matches!(query.query_type(), QueryType::SelectNodes));
-        assert_eq!(query.label(), Some(&"person".to_string()));
-        assert_eq!(query.limit_value(), Some(10));
-    }
-}

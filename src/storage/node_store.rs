@@ -7,9 +7,9 @@ use dashmap::DashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs::{File, OpenOptions};
-use tokio::io::{AsyncSeekExt, AsyncWriteExt, SeekFrom};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
 use tokio::sync::RwLock;
-use tracing::{debug, trace};
+use tracing::{debug, trace, warn};
 use uuid::Uuid;
 
 /// Node storage with serialization, indexing, and efficient retrieval
@@ -18,7 +18,7 @@ pub struct NodeStore {
     file_reader: Arc<FileReader>,
     cache: Arc<Cache>,
     node_file: Arc<RwLock<File>>,
-    node_index: DashMap<String, u64>, // node_id -> file_offset
+    node_index: DashMap<String, (u64, u32)>, // node_id -> (file_offset, data_length)
     data_path: PathBuf,
 }
 
@@ -48,7 +48,7 @@ impl NodeStore {
             data_path,
         };
 
-        // Load existing index
+        // Load existing index - this is crucial for persistence
         store.load_index().await?;
 
         debug!(
@@ -71,13 +71,19 @@ impl NodeStore {
             serialized
         };
 
+        // Add length prefix for proper record boundaries
+        let data_length = compressed.len() as u32;
+        let mut record_data = Vec::with_capacity(4 + compressed.len());
+        record_data.extend_from_slice(&data_length.to_le_bytes());
+        record_data.extend_from_slice(&compressed);
+
         let mut file = self.node_file.write().await;
         let offset = file
             .seek(SeekFrom::End(0))
             .await
             .map_err(|e| DatabaseError::Io(format!("Failed to seek: {}", e)))?;
 
-        file.write_all(&compressed)
+        file.write_all(&record_data)
             .await
             .map_err(|e| DatabaseError::Io(format!("Failed to write node: {}", e)))?;
 
@@ -87,13 +93,17 @@ impl NodeStore {
                 .map_err(|e| DatabaseError::Io(format!("Failed to sync: {}", e)))?;
         }
 
-        // Update index and cache
-        self.node_index.insert(node.id.clone(), offset);
+        // Update index with offset and actual data length
+        self.node_index
+            .insert(node.id.clone(), (offset, data_length));
         self.cache
             .put(format!("node:{}", node.id), compressed.clone());
         self.cache.put_index(format!("node:{}", node.id), offset);
 
-        trace!("Stored node {} at offset {}", node.id, offset);
+        trace!(
+            "Stored node {} at offset {} with length {}",
+            node.id, offset, data_length
+        );
         Ok(node.id)
     }
 
@@ -114,12 +124,14 @@ impl NodeStore {
             return Ok(Some(deserialize(&decompressed)?));
         }
 
-        // Get from file
-        if let Some(offset) = self.node_index.get(node_id) {
-            let offset = *offset;
-            trace!("Loading node {} from offset {}", node_id, offset);
+        // Get from file using index
+        if let Some((offset, length)) = self.node_index.get(node_id).map(|v| *v) {
+            trace!(
+                "Loading node {} from offset {} with length {}",
+                node_id, offset, length
+            );
 
-            let data = self.read_node_at_offset(offset).await?;
+            let data = self.read_node_at_offset(offset, length).await?;
             let decompressed = if self.config.compression {
                 lz4_flex::decompress_size_prepended(&data).map_err(|e| {
                     DatabaseError::Serialization(format!("Decompression failed: {}", e))
@@ -225,6 +237,13 @@ impl NodeStore {
     /// Load index from file
     async fn load_index(&self) -> Result<()> {
         if !self.file_reader.exists(&self.data_path).await {
+            debug!("No existing node file found, starting with empty index");
+            return Ok(());
+        }
+
+        let file_size = self.file_reader.file_size(&self.data_path).await?;
+        if file_size == 0 {
+            debug!("Node file is empty, no index to load");
             return Ok(());
         }
 
@@ -233,48 +252,99 @@ impl NodeStore {
             .map_err(|e| DatabaseError::Io(format!("Failed to open file: {}", e)))?;
 
         let mut offset = 0u64;
+        let mut loaded_nodes = 0;
 
-        loop {
+        while offset < file_size {
+            // Seek to current position
             file.seek(SeekFrom::Start(offset))
                 .await
                 .map_err(|e| DatabaseError::Io(format!("Failed to seek: {}", e)))?;
 
-            // Try to read node at current offset
-            match self.read_node_at_offset(offset).await {
-                Ok(data) => {
-                    let decompressed = if self.config.compression {
-                        lz4_flex::decompress_size_prepended(&data).map_err(|e| {
-                            DatabaseError::Serialization(format!("Decompression failed: {}", e))
-                        })?
-                    } else {
-                        data.clone()
-                    };
-
-                    if let Ok(node) = deserialize::<Node>(&decompressed) {
-                        self.node_index.insert(node.id.clone(), offset);
-                        offset += if self.config.compression {
-                            data.len() as u64
-                        } else {
-                            decompressed.len() as u64
-                        };
-                    } else {
-                        break;
-                    }
+            // Read length prefix (4 bytes)
+            let mut length_bytes = [0u8; 4];
+            match file.read_exact(&mut length_bytes).await {
+                Ok(_) => {}
+                Err(_) => {
+                    // End of file or corrupted data
+                    warn!(
+                        "Could not read length prefix at offset {}, stopping index load",
+                        offset
+                    );
+                    break;
                 }
-                Err(_) => break,
             }
+
+            let data_length = u32::from_le_bytes(length_bytes);
+            if data_length == 0 || data_length > 10_000_000 {
+                // Sanity check: prevent reading huge chunks
+                warn!(
+                    "Invalid data length {} at offset {}, stopping index load",
+                    data_length, offset
+                );
+                break;
+            }
+
+            // Read the actual data
+            let mut data = vec![0u8; data_length as usize];
+            match file.read_exact(&mut data).await {
+                Ok(_) => {}
+                Err(_) => {
+                    warn!(
+                        "Could not read data of length {} at offset {}, stopping index load",
+                        data_length, offset
+                    );
+                    break;
+                }
+            }
+
+            // Try to deserialize the node
+            match self.deserialize_node_data(&data) {
+                Ok(node) => {
+                    self.node_index
+                        .insert(node.id.clone(), (offset + 4, data_length)); // +4 for length prefix
+                    loaded_nodes += 1;
+                    trace!("Loaded node {} from offset {}", node.id, offset);
+                }
+                Err(e) => {
+                    warn!("Failed to deserialize node at offset {}: {}", offset, e);
+                    break;
+                }
+            }
+
+            // Move to next record (4 bytes for length + data length)
+            offset += 4 + data_length as u64;
         }
 
-        debug!("Loaded {} nodes from index", self.node_index.len());
+        debug!("Loaded {} nodes from index file", loaded_nodes);
         Ok(())
     }
 
-    /// Read node data at specific offset
-    async fn read_node_at_offset(&self, offset: u64) -> Result<Vec<u8>> {
-        // For simplicity, read a reasonable chunk and find the node boundary
-        const CHUNK_SIZE: usize = 8192;
-        self.file_reader
-            .read_chunk(&self.data_path, offset, CHUNK_SIZE)
+    /// **NEW** Helper method to deserialize node data (handles compression)
+    fn deserialize_node_data(&self, data: &[u8]) -> Result<Node> {
+        let decompressed = if self.config.compression {
+            lz4_flex::decompress_size_prepended(data)
+                .map_err(|e| DatabaseError::Serialization(format!("Decompression failed: {}", e)))?
+        } else {
+            data.to_vec()
+        };
+        deserialize(&decompressed)
+    }
+
+    /// **FIXED** Read node data at specific offset with known length
+    async fn read_node_at_offset(&self, offset: u64, length: u32) -> Result<Vec<u8>> {
+        let mut file = File::open(&self.data_path)
             .await
+            .map_err(|e| DatabaseError::Io(format!("Failed to open file: {}", e)))?;
+
+        file.seek(SeekFrom::Start(offset))
+            .await
+            .map_err(|e| DatabaseError::Io(format!("Failed to seek: {}", e)))?;
+
+        let mut buffer = vec![0u8; length as usize];
+        file.read_exact(&mut buffer)
+            .await
+            .map_err(|e| DatabaseError::Io(format!("Failed to read data: {}", e)))?;
+
+        Ok(buffer)
     }
 }
