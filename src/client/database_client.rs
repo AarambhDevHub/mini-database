@@ -3,6 +3,7 @@ use crate::core::Database;
 use crate::query::{QueryBuilder, QueryExecutor};
 use crate::types::{Edge, Node, Value};
 use crate::utils::error::Result;
+use std::fmt;
 use tracing::{debug, info};
 
 /// Main client API with CRUD operations and transaction support
@@ -10,6 +11,14 @@ use tracing::{debug, info};
 pub struct DatabaseClient {
     database: Database,
     executor: QueryExecutor,
+}
+
+impl fmt::Debug for DatabaseClient {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DatabaseClient")
+            .field("database", &"<Database Instance>")
+            .finish_non_exhaustive()
+    }
 }
 
 impl DatabaseClient {

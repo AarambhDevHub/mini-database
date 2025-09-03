@@ -22,6 +22,7 @@ pub use query::QueryBuilder;
 
 // Re-export server components
 pub use client::NetworkDatabaseClient;
+pub use client::{AggregateFunction, JoinBuilder, JoinCondition, JoinResult, JoinType};
 pub use server::{ConnectionPool, DatabaseServer, ServerConfig};
 
 #[cfg(test)]
