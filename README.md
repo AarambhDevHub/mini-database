@@ -702,12 +702,6 @@ We are building Mini Database step-by-step to become a full-featured, production
 
 ***
 
-If you want, I can format it nicely or append it to your existing README contents directly.
-
-[1](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/84013840/982cee42-287a-437a-8373-0b4cc97816bb/README.md)
-
----
-
 ## 🤝 **Contributing**
 
 1. **Fork** the repository
