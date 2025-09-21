@@ -8,14 +8,16 @@ pub mod core;
 pub mod query;
 pub mod server;
 pub mod storage;
+pub mod transaction;
 pub mod types;
 pub mod utils;
 
 // Re-export main API
 pub use client::DatabaseClient;
 pub use core::{Database, DatabaseConfig};
+pub use transaction::{Transaction, TransactionIsolationLevel, TransactionManager};
 pub use types::{Edge, Node, Value};
-pub use utils::error::{DatabaseError, Result};
+pub use utils::error::{DatabaseError, Result}; // Add transaction exports
 
 // Re-export query builder
 pub use query::QueryBuilder;

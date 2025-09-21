@@ -380,14 +380,23 @@ impl EdgeStore {
     }
 
     /// Update an existing edge
-    pub async fn update(&self, edge: &Edge) -> Result<bool> {
+    pub async fn update(&self, edge: Edge) -> Result<bool> {
         if !self.edge_index.contains_key(&edge.id) {
             return Ok(false);
         }
 
-        // For simplicity, we append the updated edge (copy-on-write)
-        // In a production system, you might implement in-place updates for fixed-size records
+        // Remove from adjacency index first (with old edge data)
+        if let Some(old_edge) = self.get(&edge.id).await? {
+            self.remove_from_adjacency_index(&old_edge);
+        }
+
+        // Store the updated edge (this appends the new version)
         self.store(edge.clone()).await?;
+
+        // Update adjacency index with new edge data
+        self.update_adjacency_index(&edge);
+
+        debug!("Updated edge: {}", edge.id);
         Ok(true)
     }
 

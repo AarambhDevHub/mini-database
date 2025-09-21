@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+use crate::transaction::TransactionManagerConfig;
+
 /// Database configuration settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
@@ -24,6 +26,9 @@ pub struct DatabaseConfig {
 
     /// Index page size
     pub index_page_size: usize,
+
+    /// Transaction system configuration
+    pub transaction_config: Option<TransactionManagerConfig>,
 }
 
 impl Default for DatabaseConfig {
@@ -36,6 +41,7 @@ impl Default for DatabaseConfig {
             sync_writes: false,
             mmap_threshold: 64 * 1024, // 64KB
             index_page_size: 4096,
+            transaction_config: None,
         }
     }
 }
@@ -64,6 +70,11 @@ impl DatabaseConfig {
     /// Enable or disable sync writes
     pub fn with_sync_writes(mut self, enabled: bool) -> Self {
         self.sync_writes = enabled;
+        self
+    }
+
+    pub fn with_transactions(mut self, config: TransactionManagerConfig) -> Self {
+        self.transaction_config = Some(config);
         self
     }
 }

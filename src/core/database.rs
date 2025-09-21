@@ -9,7 +9,7 @@ use tracing::{debug, info};
 /// Main database instance managing all storage components
 #[derive(Clone)] // Add Serialize, Deserialize
 pub struct Database {
-    config: Arc<DatabaseConfig>,
+    pub config: Arc<DatabaseConfig>,
     node_store: Arc<NodeStore>,
     edge_store: Arc<EdgeStore>,
     index: Arc<RwLock<Index>>,

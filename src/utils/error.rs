@@ -41,6 +41,33 @@ pub enum DatabaseError {
 
     #[error("Internal error: {0}")]
     Internal(String),
+
+    #[error("Deadlock detected: {0}")]
+    Deadlock(String),
+
+    #[error("Lock timeout: {0}")]
+    LockTimeout(String),
+
+    #[error("Constraint violation: {0}")]
+    ConstraintViolation(String),
+
+    #[error("Configuration error: {0}")]
+    Config(String),
+
+    #[error("Network error: {0}")]
+    Network(String),
+
+    #[error("Protocol error: {0}")]
+    Protocol(String),
+
+    #[error("Authentication error: {0}")]
+    Authentication(String),
+
+    #[error("Authorization error: {0}")]
+    Authorization(String),
+
+    #[error("Generic error: {0}")]
+    Generic(String),
 }
 
 impl DatabaseError {
@@ -69,6 +96,17 @@ impl DatabaseError {
         Self::Query(msg.into())
     }
 
+    pub fn is_retryable(&self) -> bool {
+        matches!(
+            self,
+            Self::Io(_)
+                | Self::Timeout(_)
+                | Self::Connection(_)
+                | Self::ResourceExhausted(_)
+                | Self::Internal(_)
+        )
+    }
+
     /// Check if error is retriable
     pub fn is_retriable(&self) -> bool {
         matches!(
@@ -93,6 +131,15 @@ impl DatabaseError {
             Self::PermissionDenied(_) => "permission_denied",
             Self::ResourceExhausted(_) => "resource_exhausted",
             Self::Internal(_) => "internal",
+            Self::Network(_) => "network",
+            Self::Protocol(_) => "protocol",
+            Self::Deadlock(_) => "deadlock",
+            Self::Authentication(_) => "authentication",
+            Self::Authorization(_) => "authorization",
+            Self::LockTimeout(_) => "lock_timeout",
+            Self::ConstraintViolation(_) => "constraint_violation",
+            Self::Config(_) => "config",
+            Self::Generic(_) => "generic",
         }
     }
 }

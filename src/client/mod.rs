@@ -1,5 +1,6 @@
 //! Client interface for database operations
 
+pub mod batch;
 pub mod database_client;
 pub mod join;
 pub mod network_client;
