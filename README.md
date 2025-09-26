@@ -113,7 +113,7 @@ Add to your `Cargo.toml`:
 
 ```
 [dependencies]
-mini-database = { path = "path/to/mini-database" }
+mini-database = { git = "https://github.com/AarambhDevHub/mini-database.git" }
 tokio = { version = "1.0", features = ["full"] }
 ```
 
