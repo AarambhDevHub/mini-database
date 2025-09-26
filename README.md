@@ -713,7 +713,7 @@ We are building Mini Database step-by-step to become a full-featured, production
 ### **Development Setup**
 
 ```
-git clone https://github.com/username/mini-database.git
+git clone https://github.com/AarambhDevHub/mini-database.git
 cd mini-database
 cargo build
 cargo test
@@ -731,6 +731,14 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ---
 
+## ☕ Support & Community
+
+If you find Ignitia helpful, consider supporting the project:
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/aarambhdevhub)
+
+---
+
 ## 🙏 **Acknowledgments**
 
 - **Tokio** - Asynchronous runtime
@@ -743,9 +751,8 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ## 📞 **Support**
 
-- **Issues**: [GitHub Issues](https://github.com/username/mini-database/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/username/mini-database/discussions)
-- **Email**: your.email@example.com
+- **Issues**: [GitHub Issues](https://github.com/AarambhDevHub/mini-database/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/AarambhDevHub/mini-database/discussions)
 
 ---
 
